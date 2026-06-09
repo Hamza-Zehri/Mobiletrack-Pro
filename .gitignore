@@ -1,20 +1,3 @@
-# ── Sensitive files (keep local — never upload) ─────────────────────────────
-.env
-.env.*
-.env.local
-.env.production
-activation.dat
-licenses.txt
-license-keys.txt
-config/secrets.json
-secrets.json
-credentials.json
-private-keys/
-license-keys/
-MobileShopSystem/
-*.pem
-*.key
-*.license
 
 # ── Dependencies ────────────────────────────────────────────────────────────
 node_modules/
