@@ -1,0 +1,82 @@
+{
+  "name": "mobiletrack-pro",
+  "version": "1.0.0",
+  "description": "Mobile Shop Inventory & Sales Management System",
+  "main": "electron/main.js",
+  "homepage": "./",
+  "author": "Engr. Hamza Asad",
+  "scripts": {
+    "dev": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
+    "react-start": "react-scripts start",
+    "react-build": "react-scripts build",
+    "build": "npm run react-build && electron-builder",
+    "electron": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "npm run react-build && electron-builder",
+    "license:generate": "node electron/tools/generateLicenseKey.js"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-toast": "^1.1.5",
+    "better-sqlite3": "^9.4.3",
+    "bcryptjs": "^2.4.3",
+    "date-fns": "^3.3.1",
+    "electron-store": "^8.1.0",
+    "fs-extra": "^11.2.0",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
+    "lucide-react": "^0.344.0",
+    "node-cron": "^3.0.3",
+    "qrcode": "^1.5.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3",
+    "recharts": "^2.12.2",
+    "xlsx": "^0.18.5",
+    "archiver": "^7.0.1",
+    "unzipper": "^0.12.3",
+    "crypto-js": "^4.2.0",
+    "react-hook-form": "^7.51.1",
+    "clsx": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^20.11.24",
+    "@types/react": "^18.2.61",
+    "@types/react-dom": "^18.2.19",
+    "concurrently": "^8.2.2",
+    "electron": "^29.1.1",
+    "electron-builder": "^24.13.3",
+    "react-scripts": "5.0.1",
+    "typescript": "^5.4.2",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "extends": null,
+    "appId": "com.hamzaasad.mobiletrackpro",
+    "productName": "MobileTrack Pro",
+    "icon": "assets/icon.png",
+    "directories": { "output": "dist" },
+    "files": ["build/**/*", "electron/**/*", "node_modules/**/*", "assets/**/*"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/icon.ico",
+      "forceCodeSigning": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "extraResources": [{ "from": "assets/", "to": "assets/", "filter": ["**/*"] }]
+  },
+  "browserslist": { "production": [">0.2%","not dead","not op_mini all"], "development": ["last 1 chrome version"] }
+}
