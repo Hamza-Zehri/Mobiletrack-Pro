@@ -212,7 +212,14 @@ export interface RecentActivity {
 }
 
 // ─── License ─────────────────────────────────────────────────────────────────
-export type LicenseStatusType = 'not_activated' | 'active' | 'device_mismatch' | 'corrupt';
+export type LicenseStatusType = 'not_activated' | 'active' | 'trial_active' | 'trial_expired' | 'device_mismatch' | 'corrupt';
+
+export interface TrialInfo {
+  onTrial: boolean;
+  daysLeft: number;
+  expired: boolean;
+  trialStartDate: string | null;
+}
 
 export interface LicenseStatus {
   status: LicenseStatusType;
@@ -225,6 +232,7 @@ export interface LicenseStatus {
   activatedAt?: string;
   appVersion?: string;
   activationPath?: string;
+  trial?: TrialInfo;
 }
 
 export interface LicenseOwnerInfo extends LicenseStatus {
@@ -280,6 +288,7 @@ declare global {
         getStatus(): Promise<LicenseStatus>;
         getDeviceId(): Promise<string>;
         activate(key: string): Promise<LicenseActivateResult>;
+        startTrial(): Promise<{ ok: boolean; error?: string; message?: string }>;
         getOwnerInfo(): Promise<LicenseOwnerInfo>;
         deactivate(): Promise<{ ok: boolean; error?: string }>;
         getPaths(): Promise<{ activationDir: string; activationFile: string }>;

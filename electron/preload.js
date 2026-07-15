@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
     getStatus:    () => invoke('license:getStatus'),
     getDeviceId:  () => invoke('license:getDeviceId'),
     activate:     (key) => invoke('license:activate', key),
+    startTrial:   () => invoke('license:startTrial'),
     getOwnerInfo: () => invoke('license:getOwnerInfo'),
     deactivate:   () => invoke('license:deactivate'),
     getPaths:     () => invoke('license:getPaths'),

@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import Layout from './components/layout/Layout';
+import Welcome from './pages/Welcome';
 import Activation from './pages/Activation';
 import DeviceMismatch from './pages/DeviceMismatch';
 import SetupWizard from './pages/SetupWizard';
@@ -39,6 +40,10 @@ const AppRoutes: React.FC = () => {
 
   if (licenseStatus?.deviceMismatch) return <DeviceMismatch />;
 
+  // Fresh install — no activation file: show Welcome (Choose key or trial)
+  if (licenseStatus?.status === 'not_activated') return <Welcome />;
+
+  // Trial expired or other non-activated: show Activation (must enter key)
   if (!licenseStatus?.activated) return <Activation />;
 
   if (isFirstRun) return <SetupWizard />;

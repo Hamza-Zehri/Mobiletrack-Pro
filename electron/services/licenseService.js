@@ -11,8 +11,9 @@ const ACTIVATION_FILE     = 'activation.dat';
 const STORAGE_SALT        = 'mtp_activation_storage_v1';
 const LICENSE_HMAC_SECRET = 'MobileTrackPro_License_HamzaAsad_2026';
 const FILE_MAGIC          = 'MTPACT1';
+const TRIAL_DAYS          = 7;
 
-/** @typedef {'not_activated'|'active'|'device_mismatch'|'corrupt'} LicenseStatus */
+/** @typedef {'not_activated'|'active'|'trial_active'|'trial_expired'|'device_mismatch'|'corrupt'} LicenseStatus */
 
 class LicenseService {
   /**
@@ -187,13 +188,53 @@ class LicenseService {
     fs.renameSync(tmp, this.activationPath);
   }
 
+  /** Start the 7-day trial explicitly (user chose "Start Trial" on Welcome page). */
+  startTrial() {
+    const existing = this._readActivation();
+    if (existing?.licenseKey) {
+      return { ok: false, error: 'This device already has a license key activated.' };
+    }
+    if (existing?.trialStartDate) {
+      const trial = this._computeTrial(existing);
+      if (!trial.expired) {
+        return { ok: true, message: 'Trial already active.' };
+      }
+    }
+
+    const record = {
+      v: 1,
+      trialStartDate: new Date().toISOString(),
+    };
+    this._writeActivation(record);
+    return { ok: true };
+  }
+
+  /** Compute trial info from a record without writing anything. */
+  _computeTrial(record) {
+    if (!record?.trialStartDate) return { onTrial: false, daysLeft: 0, expired: true, trialStartDate: null };
+    const start    = new Date(record.trialStartDate);
+    const now      = new Date();
+    const elapsed  = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    const daysLeft = Math.max(0, TRIAL_DAYS - elapsed);
+    return { onTrial: true, daysLeft, expired: daysLeft <= 0, trialStartDate: record.trialStartDate };
+  }
+
+  /** Get trial info from stored record. */
+  getTrialInfo() {
+    const record = this._readActivation();
+    if (!record) return { onTrial: false, daysLeft: 0, expired: true, trialStartDate: null };
+    if (record.licenseKey) return { onTrial: false, daysLeft: 0, expired: false, trialStartDate: null };
+    return this._computeTrial(record);
+  }
+
   /**
-   * @returns {{ status: LicenseStatus, activated: boolean, deviceMismatch: boolean, message?: string, deviceId: string, licenseKey?: string, activatedAt?: string, appVersion?: string }}
+   * @returns {{ status: LicenseStatus, activated: boolean, deviceMismatch: boolean, message?: string, deviceId: string, licenseKey?: string, activatedAt?: string, appVersion?: string, trial?: object }}
    */
   getStatus() {
     const deviceId = this.getDeviceId();
     const record   = this._readActivation();
 
+    // No activation file at all — fresh install, show Welcome page
     if (!record) {
       return {
         status: 'not_activated',
@@ -204,55 +245,81 @@ class LicenseService {
       };
     }
 
-    if (!record.licenseKey || !record.deviceId) {
-      return {
-        status: 'corrupt',
-        activated: false,
-        deviceMismatch: false,
-        message: 'Activation data is invalid. Please activate again.',
-        deviceId,
-      };
-    }
+    // Has a valid license key — check device binding
+    if (record.licenseKey) {
+      if (!record.deviceId) {
+        return {
+          status: 'corrupt',
+          activated: false,
+          deviceMismatch: false,
+          message: 'Activation data is invalid. Please activate again.',
+          deviceId,
+        };
+      }
 
-    const keyCheck = this.validateLicenseKey(record.licenseKey);
-    if (!keyCheck.valid) {
-      return {
-        status: 'corrupt',
-        activated: false,
-        deviceMismatch: false,
-        message: 'Stored license key is invalid. Please activate again.',
-        deviceId,
-      };
-    }
+      const keyCheck = this.validateLicenseKey(record.licenseKey);
+      if (!keyCheck.valid) {
+        return {
+          status: 'corrupt',
+          activated: false,
+          deviceMismatch: false,
+          message: 'Stored license key is invalid. Please activate again.',
+          deviceId,
+        };
+      }
 
-    if (record.deviceId !== deviceId) {
+      if (record.deviceId !== deviceId) {
+        return {
+          status: 'device_mismatch',
+          activated: false,
+          deviceMismatch: true,
+          message: 'This license is registered to another device. Copied activation files cannot be used on a different computer. Please contact Engr. Hamza Asad for a new license.',
+          deviceId,
+          licenseKey: this._maskKey(record.licenseKey),
+          activatedAt: record.activatedAt,
+        };
+      }
+
       return {
-        status: 'device_mismatch',
-        activated: false,
-        deviceMismatch: true,
-        message: 'This license is registered to another device and cannot be used on this computer.',
+        status: 'active',
+        activated: true,
+        deviceMismatch: false,
         deviceId,
         licenseKey: this._maskKey(record.licenseKey),
+        licenseKeyFull: record.licenseKey,
         activatedAt: record.activatedAt,
+        appVersion: record.appVersion,
+        activationPath: this.activationPath,
+      };
+    }
+
+    // No license key — trial mode
+    const trial = this._computeTrial(record);
+    if (trial.expired) {
+      return {
+        status: 'trial_expired',
+        activated: false,
+        deviceMismatch: false,
+        message: 'Your 7-day trial has expired. Please enter a license key to continue.',
+        deviceId,
+        trial,
+        activationPath: this.activationPath,
       };
     }
 
     return {
-      status: 'active',
+      status: 'trial_active',
       activated: true,
       deviceMismatch: false,
       deviceId,
-      licenseKey: this._maskKey(record.licenseKey),
-      licenseKeyFull: record.licenseKey,
-      activatedAt: record.activatedAt,
-      appVersion: record.appVersion,
+      trial,
       activationPath: this.activationPath,
     };
   }
 
   isActivated() {
     const s = this.getStatus();
-    return s.status === 'active';
+    return s.status === 'active' || s.status === 'trial_active';
   }
 
   _maskKey(key) {
@@ -264,6 +331,7 @@ class LicenseService {
 
   /**
    * Activate with license key; binds to current device.
+   * Clears trial data — activation is now permanent.
    */
   activate(licenseKey) {
     const validation = this.validateLicenseKey(licenseKey);
@@ -297,6 +365,7 @@ class LicenseService {
   getOwnerInfo() {
     const status = this.getStatus();
     const record = this._readActivation();
+    const trial  = this._computeTrial(record);
     return {
       ...status,
       licenseKey: record?.licenseKey || null,
@@ -304,6 +373,7 @@ class LicenseService {
       deviceId: this.getDeviceId(),
       activationFile: this.activationPath,
       activationDir: this.activationDir,
+      trial,
     };
   }
 

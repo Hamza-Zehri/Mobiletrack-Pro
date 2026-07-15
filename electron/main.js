@@ -146,6 +146,7 @@ function registerIpcHandlers(svc, bk) {
   ipcMain.handle('license:getStatus',    () => licenseService.getStatus());
   ipcMain.handle('license:getDeviceId',  () => licenseService.getDeviceId());
   ipcMain.handle('license:activate',     (_, key) => licenseService.activate(key));
+  ipcMain.handle('license:startTrial',   () => licenseService.startTrial());
   ipcMain.handle('license:getOwnerInfo', () => licenseService.getOwnerInfo());
   ipcMain.handle('license:deactivate',   () => licenseService.deactivate());
   ipcMain.handle('license:getPaths',     () => licenseService.getPaths());

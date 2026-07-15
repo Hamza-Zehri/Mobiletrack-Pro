@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Settings, LicenseStatus } from '../types';
+import { Settings, LicenseStatus, TrialInfo } from '../types';
 
 interface AppContextType {
   isLoggedIn: boolean;
   isFirstRun: boolean;
   licenseLoading: boolean;
   licenseStatus: LicenseStatus | null;
+  trialInfo: TrialInfo | null;
   settings: Settings | null;
   theme: 'dark' | 'light';
   logoBase64: string | null;
@@ -15,6 +16,7 @@ interface AppContextType {
   refreshSettings: () => Promise<void>;
   refreshLicense: () => Promise<LicenseStatus>;
   activateLicense: (key: string) => Promise<{ ok: boolean; error?: string }>;
+  startTrial: () => Promise<{ ok: boolean; error?: string }>;
   toggleTheme: () => void;
   toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   toastState: { msg: string; type: string; visible: boolean };
@@ -27,6 +29,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isFirstRun,     setFirstRun]     = useState(false);
   const [licenseLoading, setLicenseLoading] = useState(true);
   const [licenseStatus,  setLicenseStatus]  = useState<LicenseStatus | null>(null);
+  const [trialInfo,      setTrialInfo]      = useState<TrialInfo | null>(null);
   const [settings,       setSettings]     = useState<Settings | null>(null);
   const [logoBase64,     setLogo]         = useState<string | null>(null);
   const [theme,          setTheme]        = useState<'dark' | 'light'>('dark');
@@ -42,6 +45,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshLicense = useCallback(async () => {
     const status = await window.api.license.getStatus();
     setLicenseStatus(status);
+    setTrialInfo(status.trial || null);
     setLicenseLoading(false);
     return status;
   }, []);
@@ -94,6 +98,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return res;
   };
 
+  const startTrial = async () => {
+    const res = await window.api.license.startTrial();
+    if (res.ok) {
+      await refreshLicense();
+    }
+    return res;
+  };
+
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
   const toast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -103,9 +115,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      isLoggedIn, isFirstRun, licenseLoading, licenseStatus,
+      isLoggedIn, isFirstRun, licenseLoading, licenseStatus, trialInfo,
       settings, theme, logoBase64,
-      login, logout, completeSetup, refreshSettings, refreshLicense, activateLicense,
+      login, logout, completeSetup, refreshSettings, refreshLicense, activateLicense, startTrial,
       toggleTheme, toast, toastState,
     }}>
       {children}
