@@ -34,25 +34,34 @@ mobiletrack-pro/
 │   ├── main.js                 # Electron main process + IPC handlers
 │   ├── preload.js              # Secure context bridge (window.api)
 │   ├── database.js             # SQLite DB init + schema
+│   ├── tools/
+│   │   └── generateLicenseKey.js  # Vendor tool — generate license keys
 │   └── services/
 │       ├── dbService.js        # All CRUD operations
 │       ├── pdfService.js       # Invoice + Report PDF generation
 │       ├── excelService.js     # Excel export
 │       ├── backupService.js    # Encrypted backup/restore
-│       └── schedulerService.js # Auto-backup cron scheduler
+│       ├── schedulerService.js # Auto-backup cron scheduler
+│       ├── licenseService.js   # License validation, trial, activation
+│       └── cryptoService.js    # Field-level encryption
 │
 ├── src/
-│   ├── App.tsx                 # Router + auth guard
-│   ├── context/AppContext.tsx  # Global state (auth, settings, theme)
+│   ├── App.tsx                 # Router + auth/license guard
+│   ├── context/AppContext.tsx  # Global state (auth, settings, theme, license)
 │   ├── types/index.ts          # All TypeScript types + window.api typing
 │   ├── utils/index.ts          # Helpers (money, formatDate, etc.)
 │   ├── styles/global.css       # Design system (dark/light CSS vars)
 │   │
 │   ├── components/
 │   │   ├── layout/Layout.tsx   # Sidebar + Topbar + Window controls
-│   │   └── ui/Toast.tsx        # Toast, Modal, Badge, Confirm, Spinner
+│   │   └── ui/
+│   │       ├── Toast.tsx       # Toast, Modal, Badge, Confirm, Spinner
+│   │       └── SupportContact.tsx  # Developer contact component
 │   │
 │   └── pages/
+│       ├── Welcome.tsx         # First launch: Enter key or Start trial
+│       ├── Activation.tsx      # License key entry (expired trial)
+│       ├── DeviceMismatch.tsx  # Device mismatch + re-activation
 │       ├── SetupWizard.tsx     # First-run 4-step setup
 │       ├── Login.tsx           # Authentication
 │       ├── Dashboard.tsx       # Stats + Charts + Activity feed
@@ -68,7 +77,7 @@ mobiletrack-pro/
 │       ├── Reports.tsx         # Reports with PDF/Excel export
 │       ├── Backup.tsx          # Backup & restore
 │       ├── Settings.tsx        # Shop/Invoice/WhatsApp/Security
-│       └── About.tsx           # About page
+│       └── About.tsx           # About + License Status card
 │
 ├── public/index.html
 ├── package.json
@@ -114,15 +123,49 @@ This will:
 
 ---
 
+## Licensing & Trial System
+
+### Flow
+1. **First Launch** — Welcome page appears with two options:
+   - **"I have a license key"** → Enter activation key → permanently activated
+   - **"Start 7-day trial"** → Full access for 7 days, no restrictions
+2. **During Trial** — App works normally, license status shown in About page
+3. **After Trial Expires** — Stuck on Activation page, must enter valid key
+4. **Device Binding** — Each license key is bound to one device after activation
+
+### Key Features
+- Offline license validation (HMAC-SHA256 checksum, no internet required)
+- Hardware fingerprinting (Machine GUID, MAC address, CPU model)
+- Trial start date stored encrypted in `activation.dat`
+- License status visible in **About** page with key, activation date, trial countdown
+- DeviceMismatch page allows re-activation with a new key
+
+### Generating License Keys (Vendor Tool)
+```bash
+node electron/tools/generateLicenseKey.js        # Generate 1 key
+node electron/tools/generateLicenseKey.js 5      # Generate 5 keys
+```
+
+Key format: `MTP-XXXX-XXXX-XXXX-XXXX` (20 chars + MTP prefix)
+
+### Configuration
+- `TRIAL_DAYS = 7` in `electron/services/licenseService.js:14` — change to adjust trial length
+- Activation data stored at: `%APPDATA%\MobileShopSystem\activation.dat`
+
+---
+
 ## First Run
 
 1. Launch the app
-2. **Setup Wizard** appears:
+2. **Welcome page** appears:
+   - Choose **"I have a license key"** to activate permanently
+   - Or **"Start 7-day free trial"** to try the software
+3. **Setup Wizard** appears (after activation/trial):
    - Step 1: Enter shop info + set password
    - Step 2: Upload logo (optional)
    - Step 3: Set Urdu warranty terms
    - Step 4: Launch
-3. Login with `admin` + your chosen password
+4. Login with `admin` + your chosen password
 
 ---
 
@@ -162,6 +205,10 @@ This will:
 - Auto-backup scheduler (daily/every6h/weekly)
 - One-click restore
 
+### Responsive Design
+- All auth screens (Welcome, Activation, DeviceMismatch) are fully responsive
+- Adapts to mobile, tablet, and desktop screen sizes
+
 ---
 
 ## Database Schema
@@ -183,6 +230,9 @@ This will:
 
 - Passwords hashed with bcrypt (10 rounds)
 - Backup files encrypted with AES-256-CBC
+- License keys validated with HMAC-SHA256 checksums
+- Activation data encrypted with AES-256-GCM
+- Hardware-bound device fingerprinting
 - SQLite WAL mode for data integrity
 - Electron `contextIsolation: true` + `nodeIntegration: false`
 - All IPC via secure preload context bridge
