@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { KeyRound, Clock, Smartphone, ArrowRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import Activation from './Activation';
 
 const Welcome: React.FC = () => {
   const { startTrial } = useApp();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showActivation, setShowActivation] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 520);
 
   useEffect(() => {
@@ -27,15 +29,15 @@ const Welcome: React.FC = () => {
   };
 
   const handleEnterKey = () => {
-    window.location.hash = '#/activate';
-    window.location.reload();
+    setShowActivation(true);
   };
 
   const p = isMobile ? 16 : 32;
   const h = isMobile ? 32 : 40;
   const iconSize = isMobile ? 30 : 36;
   const titleSize = isMobile ? 20 : 24;
-  const btnH = 44;
+
+  if (showActivation) return <Activation />;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? 12 : 24 }}>
