@@ -8,6 +8,7 @@ const { execSync } = require('child_process');
 
 const ACTIVATION_DIR_NAME = 'MobileShopSystem';
 const ACTIVATION_FILE     = 'activation.dat';
+const ACTIVATION_BACKUP   = 'activation.bak';
 const STORAGE_SALT        = 'mtp_activation_storage_v1';
 const LICENSE_HMAC_SECRET = 'MobileTrackPro_License_HamzaAsad_2026';
 const FILE_MAGIC          = 'MTPACT1';
@@ -24,6 +25,7 @@ class LicenseService {
     this.appVersion    = appVersion || '1.0.0';
     this.activationDir = path.join(appDataPath, ACTIVATION_DIR_NAME);
     this.activationPath = path.join(this.activationDir, ACTIVATION_FILE);
+    this.backupPath    = path.join(this.activationDir, ACTIVATION_BACKUP);
     this._deviceId     = null;
     this._storageKey   = crypto.scryptSync(LICENSE_HMAC_SECRET, STORAGE_SALT, 32);
     this._ensureDir();
@@ -73,14 +75,16 @@ class LicenseService {
 
   _getPrimaryMac() {
     const ifaces = os.networkInterfaces();
+    const macs = [];
     for (const name of Object.keys(ifaces)) {
       for (const iface of ifaces[name] || []) {
         if (!iface.internal && iface.mac && iface.mac !== '00:00:00:00:00:00') {
-          return iface.mac;
+          macs.push(iface.mac);
         }
       }
     }
-    return '';
+    // Sort MACs so device ID is stable regardless of interface enumeration order
+    return macs.sort().join(',');
   }
 
   /** Normalize user input: MTP-XXXX-XXXX-XXXX-XXXX */
@@ -171,9 +175,15 @@ class LicenseService {
   }
 
   _readActivation() {
-    if (!fs.existsSync(this.activationPath)) return null;
+    return this._readActivationFile(this.activationPath)
+        || this._readActivationFile(this.backupPath)
+        || null;
+  }
+
+  _readActivationFile(filePath) {
+    if (!fs.existsSync(filePath)) return null;
     try {
-      const raw = fs.readFileSync(this.activationPath, 'utf8');
+      const raw = fs.readFileSync(filePath, 'utf8');
       return this._decryptPayload(raw.trim());
     } catch {
       return null;
@@ -186,6 +196,10 @@ class LicenseService {
     const tmp = this.activationPath + '.tmp';
     fs.writeFileSync(tmp, encrypted, 'utf8');
     fs.renameSync(tmp, this.activationPath);
+    // Write backup copy
+    try {
+      fs.writeFileSync(this.backupPath, encrypted, 'utf8');
+    } catch { /* backup is best-effort */ }
   }
 
   /** Start the 7-day trial explicitly (user chose "Start Trial" on Welcome page). */
@@ -382,6 +396,9 @@ class LicenseService {
     try {
       if (fs.existsSync(this.activationPath)) {
         fs.unlinkSync(this.activationPath);
+      }
+      if (fs.existsSync(this.backupPath)) {
+        fs.unlinkSync(this.backupPath);
       }
       return { ok: true };
     } catch (err) {
