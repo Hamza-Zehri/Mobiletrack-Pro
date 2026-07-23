@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Receipt, User, DollarSign, Smartphone, ArrowLeft } from 'lucide-react';
+import { Search, Receipt, User, DollarSign, Smartphone, ArrowLeft, Edit3, RotateCcw } from 'lucide-react';
 import { Phone, Sale } from '../types';
 import { money, formatDate } from '../utils';
-import { PtaBadge, StatusBadge } from '../components/ui/Toast';
+import { PtaBadge, StatusBadge, Confirm } from '../components/ui/Toast';
 import { useApp } from '../context/AppContext';
 
 const Sales: React.FC = () => {
@@ -22,6 +22,12 @@ const Sales: React.FC = () => {
   const [customer, setCustomer] = useState({ name:'', mobile:'', cnic:'', address:'' });
   const [salePrice, setSalePrice] = useState('');
   const [discount, setDiscount]  = useState('0');
+
+  const [editSale, setEditSale] = useState<Sale | null>(null);
+  const [editPrice, setEditPrice] = useState('');
+  const [editDiscount, setEditDiscount] = useState('');
+  const [returnSale, setReturnSale] = useState<Sale | null>(null);
+  const [returnReason, setReturnReason] = useState('');
 
   const finalAmount = (parseFloat(salePrice)||0) - (parseFloat(discount)||0);
   const profit = selectedPhone ? finalAmount - selectedPhone.cost_price : 0;
@@ -63,6 +69,34 @@ const Sales: React.FC = () => {
     setSalePrice(String(p.sale_price || p.cost_price || ''));
     setPhones([]);
     setPhoneSearch('');
+  };
+
+  const handleEditSale = async () => {
+    if (!editSale) return;
+    try {
+      await window.api.sales.update(editSale.id, {
+        sale_price: parseFloat(editPrice) || editSale.sale_price,
+        discount: parseFloat(editDiscount) || 0,
+      });
+      toast('Sale updated');
+      setEditSale(null);
+      window.api.sales.getAll().then(setSales);
+    } catch(e: any) {
+      toast(e.message || 'Failed to update', 'error');
+    }
+  };
+
+  const handleReturnSale = async () => {
+    if (!returnSale) return;
+    try {
+      await window.api.sales.returnSale(returnSale.id, { reason: returnReason });
+      toast('Phone returned to inventory');
+      setReturnSale(null);
+      setReturnReason('');
+      window.api.sales.getAll().then(setSales);
+    } catch(e: any) {
+      toast(e.message || 'Failed to return', 'error');
+    }
   };
 
   const handleSell = async () => {
@@ -305,6 +339,12 @@ const Sales: React.FC = () => {
                     <td>
                       <div style={{ display:'flex', gap:5 }}>
                         <button className="icon-btn" title="View Invoice" onClick={()=>nav(`/sales/invoice/${s.id}`)}><Receipt size={13}/></button>
+                        <button className="icon-btn" title="Edit Sale" onClick={()=>{
+                          setEditSale(s);
+                          setEditPrice(String(s.sale_price));
+                          setEditDiscount(String(s.discount));
+                        }}><Edit3 size={13}/></button>
+                        <button className="icon-btn" title="Return Phone" onClick={()=>setReturnSale(s)}><RotateCcw size={13}/></button>
                       </div>
                     </td>
                   </tr>
@@ -314,6 +354,37 @@ const Sales: React.FC = () => {
           </div>
         </div>
       )}
+      {/* ── Edit Sale Modal ────────────────────────────────────────────── */}
+      {editSale && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+          <div className="card" style={{ width:400, padding:24 }}>
+            <div style={{ fontSize:16, fontWeight:700, marginBottom:16 }}>Edit Sale — {editSale.invoice_number}</div>
+            <div className="field" style={{ marginBottom:12 }}>
+              <label>Sale Price (₨)</label>
+              <input type="number" value={editPrice} onChange={e=>setEditPrice(e.target.value)} style={{ fontSize:16, fontWeight:700 }}/>
+            </div>
+            <div className="field" style={{ marginBottom:16 }}>
+              <label>Discount (₨)</label>
+              <input type="number" value={editDiscount} onChange={e=>setEditDiscount(e.target.value)}/>
+            </div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={()=>setEditSale(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleEditSale}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Return Phone Modal ────────────────────────────────────────── */}
+      <Confirm
+        open={returnSale !== null}
+        title="Return Phone"
+        message={`Return ${returnSale?.brand || ''} ${returnSale?.model || ''} (Invoice: ${returnSale?.invoice_number || ''}) back to inventory? This will reverse the sale.`}
+        confirmLabel="Return Phone"
+        danger
+        onConfirm={handleReturnSale}
+        onCancel={()=>{ setReturnSale(null); setReturnReason(''); }}
+      />
     </div>
   );
 };

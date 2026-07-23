@@ -144,7 +144,6 @@ function registerIpcHandlers(svc, bk) {
 
   // ── License (always allowed) ──
   ipcMain.handle('license:getStatus',    () => licenseService.getStatus());
-  ipcMain.handle('license:getDeviceId',  () => licenseService.getDeviceId());
   ipcMain.handle('license:activate',     (_, key) => licenseService.activate(key));
   ipcMain.handle('license:startTrial',   () => licenseService.startTrial());
   ipcMain.handle('license:getOwnerInfo', () => licenseService.getOwnerInfo());
@@ -174,6 +173,7 @@ function registerIpcHandlers(svc, bk) {
   guarded('phones:delete',    (_, id) => svc.deletePhone(id));
   guarded('phones:history',   (_, q) => svc.getPhoneHistory(q));
   guarded('phones:checkImei', (_, imei, excludeId) => svc.checkImeiDuplicate(imei, excludeId));
+  guarded('phones:getImages', (_, id) => svc.getPhoneImages(id));
 
   // ── Purchases ──
   guarded('purchases:getAll',  (_, filters) => svc.getPurchases(filters));
@@ -193,6 +193,10 @@ function registerIpcHandlers(svc, bk) {
   guarded('sales:getAll',    (_, filters) => svc.getSales(filters));
   guarded('sales:getById',   (_, id) => svc.getSaleById(id));
   guarded('sales:create',    (_, data) => svc.createSale(data));
+  guarded('sales:update',    (_, id, data) => svc.updateSale(id, data));
+  guarded('sales:return',    (_, saleId, data) => svc.returnPhone(saleId, data));
+  guarded('sales:getReturns', () => svc.getReturns());
+  guarded('sales:invested',  () => svc.getInventoryInvested());
 
   // ── Invoice / PDF ──
   guarded('invoice:generate', async (_, saleId) => {

@@ -31,10 +31,14 @@ const Customers: React.FC = () => {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await window.api.customers.delete(deleteId);
+    const res = await window.api.customers.delete(deleteId);
     setDeleteId(null);
-    toast('Customer deleted');
-    load();
+    if (res.ok) {
+      toast('Customer deleted');
+      load();
+    } else {
+      toast(res.error || 'Cannot delete customer', 'error');
+    }
   };
 
   const handleAdd = async () => {

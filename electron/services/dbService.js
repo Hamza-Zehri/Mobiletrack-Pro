@@ -174,13 +174,20 @@ class DBService {
   getDashboardStats() {
     const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
     const ms = monthStart.toISOString().slice(0,10);
+    const totalInvested = this.db.prepare("SELECT COALESCE(SUM(cost_price),0) v FROM phones WHERE status='available'").get().v;
+    const totalSoldProfit = this.db.prepare("SELECT COALESCE(SUM(profit),0) v FROM sales WHERE returned=0").get().v;
+    const totalSalesRevenue = this.db.prepare("SELECT COALESCE(SUM(final_amount),0) v FROM sales WHERE returned=0").get().v;
     return {
       totalStock:      this.db.prepare("SELECT COUNT(*) c FROM phones WHERE status='available'").get().c,
-      totalStockValue: this.db.prepare("SELECT COALESCE(SUM(cost_price),0) v FROM phones WHERE status='available'").get().v,
+      totalStockValue: totalInvested,
       totalSold:       this.db.prepare("SELECT COUNT(*) c FROM phones WHERE status='sold'").get().c,
-      monthlySales:    this.db.prepare("SELECT COALESCE(SUM(final_amount),0) v FROM sales WHERE DATE(sale_date)>=?").get(ms).v,
-      monthlyProfit:   this.db.prepare("SELECT COALESCE(SUM(profit),0) v FROM sales WHERE DATE(sale_date)>=?").get(ms).v,
+      monthlySales:    this.db.prepare("SELECT COALESCE(SUM(final_amount),0) v FROM sales WHERE DATE(sale_date)>=? AND returned=0").get(ms).v,
+      monthlyProfit:   this.db.prepare("SELECT COALESCE(SUM(profit),0) v FROM sales WHERE DATE(sale_date)>=? AND returned=0").get(ms).v,
       totalCustomers:  this.db.prepare("SELECT COUNT(*) c FROM customers").get().c,
+      totalInvested,
+      totalSoldProfit,
+      totalSalesRevenue,
+      roi: totalInvested > 0 ? ((totalSoldProfit / totalInvested) * 100).toFixed(1) : '0.0',
       byPta: {
         pta:     this.db.prepare("SELECT COUNT(*) c FROM phones WHERE status='available' AND pta_status='pta'").get().c,
         non_pta: this.db.prepare("SELECT COUNT(*) c FROM phones WHERE status='available' AND pta_status='non_pta'").get().c,
@@ -214,6 +221,7 @@ class DBService {
       SELECT s.id, s.invoice_number, s.sale_date, s.final_amount,
              ph.model, ph.brand, c.name customer
       FROM sales s JOIN phones ph ON s.phone_id=ph.id JOIN customers c ON s.customer_id=c.id
+      WHERE s.returned=0
       ORDER BY s.created_at DESC LIMIT 5
     `).all());
     return { purchases, sales };
@@ -286,8 +294,14 @@ class DBService {
         d.cost_price, d.sale_price||null, d.purchase_id||null, enc.notes
       );
       if (d.images && d.images.length) {
-        const imgStmt = this.db.prepare('INSERT INTO phone_images(phone_id,path) VALUES(?,?)');
-        d.images.forEach(p => imgStmt.run(r.lastInsertRowid, p));
+        const imgStmt = this.db.prepare('INSERT INTO phone_images(phone_id,image_type,path) VALUES(?,?,?)');
+        d.images.forEach(img => {
+          if (typeof img === 'string') {
+            imgStmt.run(r.lastInsertRowid, 'phone', img);
+          } else {
+            imgStmt.run(r.lastInsertRowid, img.type || 'phone', img.path);
+          }
+        });
       }
       return r.lastInsertRowid;
     });
@@ -306,12 +320,26 @@ class DBService {
       data.box?1:0, data.charger?1:0, data.cable?1:0, data.earphones?1:0,
       data.cost_price, data.sale_price, enc.notes, id
     );
+    if (data.images && data.images.length) {
+      const imgStmt = this.db.prepare('INSERT INTO phone_images(phone_id,image_type,path) VALUES(?,?,?)');
+      data.images.forEach(img => {
+        if (typeof img === 'string') {
+          imgStmt.run(id, 'phone', img);
+        } else {
+          imgStmt.run(id, img.type || 'phone', img.path);
+        }
+      });
+    }
     return { ok: true };
   }
 
   deletePhone(id) {
     this.db.prepare('DELETE FROM phones WHERE id=?').run(id);
     return { ok: true };
+  }
+
+  getPhoneImages(id) {
+    return this.db.prepare('SELECT * FROM phone_images WHERE phone_id=? ORDER BY created_at DESC').all(id);
   }
 
   getPhoneHistory(query) {
@@ -453,7 +481,7 @@ class DBService {
   }
 
   getCustomerById(id) {
-    return this._decryptCustomer(this.db.prepare('SELECT * FROM customers WHERE id=?').get(id));
+    return this._decCustomer(this.db.prepare('SELECT * FROM customers WHERE id=?').get(id));
   }
 
   addCustomer(data) {
@@ -469,6 +497,11 @@ class DBService {
   }
 
   deleteCustomer(id) {
+    const hasSales = this.db.prepare('SELECT COUNT(*) c FROM sales WHERE customer_id=?').get(id).c;
+    const hasPurchases = this.db.prepare('SELECT COUNT(*) c FROM purchases WHERE customer_id=?').get(id).c;
+    if (hasSales > 0 || hasPurchases > 0) {
+      return { ok: false, error: 'Cannot delete customer with existing transactions.' };
+    }
     this.db.prepare('DELETE FROM customers WHERE id=?').run(id);
     return { ok: true };
   }
@@ -492,7 +525,7 @@ class DBService {
     let sql = `SELECT s.*, ph.model, ph.brand, ph.storage, ph.pta_status, ph.imei1,
                c.name customer, c.mobile customer_mobile
                FROM sales s JOIN phones ph ON s.phone_id=ph.id JOIN customers c ON s.customer_id=c.id
-               WHERE 1=1`;
+               WHERE s.returned=0`;
     const params = [];
     if (filters.from) { sql += ' AND DATE(s.sale_date)>=?'; params.push(filters.from); }
     if (filters.to)   { sql += ' AND DATE(s.sale_date)<=?'; params.push(filters.to); }
@@ -540,6 +573,26 @@ class DBService {
     return run(data);
   }
 
+  updateSale(id, data) {
+    const run = this.db.transaction((d) => {
+      const sale = this.db.prepare('SELECT * FROM sales WHERE id=?').get(id);
+      if (!sale) throw new Error('Sale not found');
+      if (sale.returned) throw new Error('Cannot edit a returned sale');
+
+      const salePrice = d.sale_price != null ? d.sale_price : sale.sale_price;
+      const discount  = d.discount != null ? d.discount : sale.discount;
+      const finalAmount = salePrice - discount;
+      const profit = finalAmount - sale.cost_price;
+
+      this.db.prepare(`
+        UPDATE sales SET sale_price=?, discount=?, final_amount=?, profit=?, notes=? WHERE id=?
+      `).run(salePrice, discount, finalAmount, profit, d.notes || sale.notes, id);
+
+      return { ok: true };
+    });
+    return run(data);
+  }
+
   // ─── Reports ─────────────────────────────────────────────────────────────
   getSalesReport(range) {
     const { from, to } = range;
@@ -547,7 +600,7 @@ class DBService {
       SELECT s.*, ph.model, ph.brand, ph.storage, ph.pta_status, ph.imei1,
              c.name customer, c.mobile customer_mobile
       FROM sales s JOIN phones ph ON s.phone_id=ph.id JOIN customers c ON s.customer_id=c.id
-      WHERE DATE(s.sale_date) BETWEEN ? AND ? ORDER BY s.sale_date DESC
+      WHERE s.returned=0 AND DATE(s.sale_date) BETWEEN ? AND ? ORDER BY s.sale_date DESC
     `).all(from, to));
   }
 
@@ -555,12 +608,12 @@ class DBService {
     const { from, to } = range;
     const rows = this.db.prepare(`
       SELECT DATE(sale_date) d, SUM(final_amount) revenue, SUM(profit) profit, COUNT(*) qty
-      FROM sales WHERE DATE(sale_date) BETWEEN ? AND ?
+      FROM sales WHERE returned=0 AND DATE(sale_date) BETWEEN ? AND ?
       GROUP BY d ORDER BY d
     `).all(from, to);
     const totals = this.db.prepare(`
       SELECT SUM(final_amount) revenue, SUM(profit) profit, COUNT(*) qty
-      FROM sales WHERE DATE(sale_date) BETWEEN ? AND ?
+      FROM sales WHERE returned=0 AND DATE(sale_date) BETWEEN ? AND ?
     `).get(from, to);
     return { rows, totals };
   }
@@ -593,6 +646,59 @@ class DBService {
     const customer = this.getCustomerById(id);
     const history  = this.getCustomerHistory(id);
     return { customer, ...history };
+  }
+
+  // ─── Phone Returns ──────────────────────────────────────────────────────
+  returnPhone(saleId, data) {
+    const run = this.db.transaction((d) => {
+      const sale = this.db.prepare('SELECT * FROM sales WHERE id=?').get(saleId);
+      if (!sale) throw new Error('Sale not found');
+      if (sale.returned) throw new Error('This sale has already been returned');
+
+      this.db.prepare('UPDATE sales SET returned=1 WHERE id=?').run(saleId);
+      this.db.prepare("UPDATE phones SET status='available' WHERE id=?").run(sale.phone_id);
+      this.db.prepare(`
+        INSERT INTO phone_returns(sale_id, phone_id, reason, refund_amount, notes)
+        VALUES(?,?,?,?,?)
+      `).run(saleId, sale.phone_id, d.reason || null, d.refund_amount || sale.final_amount, d.notes || null);
+
+      return { ok: true, phone_id: sale.phone_id };
+    });
+    return run(data);
+  }
+
+  getReturns() {
+    return this._decryptRows(this.db.prepare(`
+      SELECT pr.*, s.invoice_number, s.sale_price, s.final_amount, s.cost_price, s.profit,
+             ph.model, ph.brand, ph.storage, ph.imei1, ph.pta_status,
+             c.name customer, c.mobile customer_mobile
+      FROM phone_returns pr
+      JOIN sales s ON pr.sale_id=s.id
+      JOIN phones ph ON pr.phone_id=ph.id
+      JOIN customers c ON s.customer_id=c.id
+      ORDER BY pr.created_at DESC
+    `).all());
+  }
+
+  // ─── Customer CNIC Images (via purchase phones) ────────────────────────
+  getCustomerCnicImages(customerId) {
+    return this._decryptRows(this.db.prepare(`
+      SELECT pi.*, ph.brand, ph.model, ph.imei1
+      FROM phone_images pi
+      JOIN phones ph ON pi.phone_id=ph.id
+      JOIN purchases pur ON ph.purchase_id=pur.id
+      WHERE pur.customer_id=? AND pi.image_type='cnic'
+      ORDER BY pi.created_at DESC
+    `).all(customerId));
+  }
+
+  // ─── Inventory Investment ──────────────────────────────────────────────
+  getInventoryInvested() {
+    const row = this.db.prepare(`
+      SELECT COUNT(*) as count, COALESCE(SUM(cost_price),0) as total
+      FROM phones WHERE status='available'
+    `).get();
+    return { count: row.count, total: row.total };
   }
 }
 

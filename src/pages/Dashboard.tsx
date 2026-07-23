@@ -25,10 +25,16 @@ const Dashboard: React.FC = () => {
     <div className="fade-in">
       {/* Stats */}
       <div className="stats-grid" style={{ marginBottom:18 }}>
-        <StatCard label="Phones In Stock" value={stats?.totalStock ?? '—'} sub={`₨ ${((stats?.totalStockValue||0)/100000).toFixed(1)}L total value`} icon={<Smartphone size={18}/>} color="purple" />
+        <StatCard label="Phones In Stock" value={stats?.totalStock ?? '—'} sub={`₨ ${((stats?.totalStockValue||0)/100000).toFixed(1)}L invested`} icon={<Smartphone size={18}/>} color="purple" />
+        <StatCard label="Total Invested"  value={money(stats?.totalInvested)} sub={`₨ ${((stats?.totalInvested||0)/100000).toFixed(1)}L in inventory`} icon={<DollarSign size={18}/>} color="amber" />
+        <StatCard label="Profit Earned"   value={money(stats?.totalSoldProfit)} sub={`${stats?.roi || '0'}% ROI on investment`} icon={<TrendingUp size={18}/>} color="green" />
+        <StatCard label="Total Revenue"   value={money(stats?.totalSalesRevenue)} sub={`${stats?.totalSold ?? 0} phones sold total`} icon={<Users size={18}/>} color="blue" />
+      </div>
+
+      <div className="stats-grid" style={{ marginBottom:18 }}>
         <StatCard label="Monthly Sales"   value={money(stats?.monthlySales)} sub="This month revenue" icon={<DollarSign size={18}/>} color="green" />
         <StatCard label="Monthly Profit"  value={money(stats?.monthlyProfit)} sub="This month profit" icon={<TrendingUp size={18}/>} color="amber" />
-        <StatCard label="Total Customers" value={stats?.totalCustomers ?? '—'} sub={`${stats?.totalSold ?? 0} phones sold total`} icon={<Users size={18}/>} color="blue" />
+        <StatCard label="Total Customers" value={stats?.totalCustomers ?? '—'} sub="Registered customers" icon={<Users size={18}/>} color="blue" />
       </div>
 
       {/* PTA Breakdown */}

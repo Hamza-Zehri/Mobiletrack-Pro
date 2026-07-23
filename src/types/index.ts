@@ -56,6 +56,7 @@ export interface Phone {
 export interface PhoneImage {
   id: number;
   phone_id: number;
+  image_type: 'phone' | 'cnic';
   path: string;
 }
 
@@ -157,6 +158,7 @@ export interface Sale {
   cost_price: number;
   profit: number;
   invoice_path?: string;
+  returned: number;
   sale_date: string;
   notes?: string;
   // joined
@@ -197,6 +199,10 @@ export interface DashboardStats {
   monthlySales: number;
   monthlyProfit: number;
   totalCustomers: number;
+  totalInvested: number;
+  totalSoldProfit: number;
+  totalSalesRevenue: number;
+  roi: string;
   byPta: { pta: number; non_pta: number; jv: number; cpid: number; android: number };
 }
 
@@ -286,8 +292,7 @@ declare global {
       app:        { paths(): Promise<{ userData: string; appData?: string; images: string; invoices: string; logo: string; backups: string; activationDir?: string; activationFile?: string }> };
       license:    {
         getStatus(): Promise<LicenseStatus>;
-        getDeviceId(): Promise<string>;
-        activate(key: string): Promise<LicenseActivateResult>;
+        activate(key: string): Promise<{ ok: boolean; error?: string; licenseKey?: string; activatedAt?: string }>;
         startTrial(): Promise<{ ok: boolean; error?: string; message?: string }>;
         getOwnerInfo(): Promise<LicenseOwnerInfo>;
         deactivate(): Promise<{ ok: boolean; error?: string }>;
@@ -297,10 +302,10 @@ declare global {
       settings:   { get(): Promise<Settings>; save(d: any): Promise<any> };
       auth:       { login(u: string, p: string): Promise<{ ok: boolean; error?: string }>; changePassword(o: string, n: string): Promise<any> };
       dashboard:  { stats(): Promise<DashboardStats>; charts(): Promise<ChartRow[]>; activity(): Promise<RecentActivity> };
-      phones:     { getAll(f?: PhoneFilters): Promise<Phone[]>; getById(id: number): Promise<Phone>; add(d: any): Promise<any>; update(id: number, d: any): Promise<any>; delete(id: number): Promise<any>; history(q: string): Promise<Phone[]>; checkImei(im: string, ex?: number): Promise<boolean> };
+      phones:     { getAll(f?: PhoneFilters): Promise<Phone[]>; getById(id: number): Promise<Phone>; add(d: any): Promise<any>; update(id: number, d: any): Promise<any>; delete(id: number): Promise<any>; history(q: string): Promise<Phone[]>; checkImei(im: string, ex?: number): Promise<boolean>; getImages(id: number): Promise<PhoneImage[]> };
       purchases:  { getAll(f?: any): Promise<Purchase[]>; getById(id: number): Promise<Purchase>; add(d: any): Promise<any>; addBulk(d: any): Promise<any> };
       customers:  { getAll(q?: string): Promise<Customer[]>; getById(id: number): Promise<Customer>; add(d: any): Promise<any>; update(id: number, d: any): Promise<any>; delete(id: number): Promise<any>; history(id: number): Promise<any> };
-      sales:      { getAll(f?: any): Promise<Sale[]>; getById(id: number): Promise<Sale>; create(d: SaleFormData): Promise<any> };
+      sales:      { getAll(f?: any): Promise<Sale[]>; getById(id: number): Promise<Sale>; create(d: SaleFormData): Promise<any>; update(id: number, d: any): Promise<any>; returnSale(saleId: number, d: any): Promise<any>; getReturns(): Promise<any[]>; invested(): Promise<{ count: number; total: number }> };
       invoice:    { generate(id: number): Promise<{ ok: boolean; path: string; invoice_number: string }> };
       whatsapp:   { share(path: string, phone: string, msg: string): Promise<any> };
       reports:    { sales(r: DateRange): Promise<any>; profit(r: DateRange): Promise<any>; purchase(r: DateRange): Promise<any>; inventory(): Promise<any>; customer(id: number): Promise<any>; exportPdf(t: string, r: DateRange): Promise<any>; exportExcel(t: string, r: DateRange): Promise<any> };

@@ -4,7 +4,6 @@ import { AppProvider, useApp } from './context/AppContext';
 import Layout from './components/layout/Layout';
 import Welcome from './pages/Welcome';
 import Activation from './pages/Activation';
-import DeviceMismatch from './pages/DeviceMismatch';
 import SetupWizard from './pages/SetupWizard';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -37,8 +36,6 @@ const AppRoutes: React.FC = () => {
   const { isLoggedIn, isFirstRun, licenseLoading, licenseStatus } = useApp();
 
   if (licenseLoading) return <LoadingScreen />;
-
-  if (licenseStatus?.deviceMismatch) return <DeviceMismatch />;
 
   // Fresh install — no activation file: show Welcome (Choose key or trial)
   if (licenseStatus?.status === 'not_activated') return <Welcome />;

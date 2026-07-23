@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, KeyRound, Cpu, Calendar, FolderOpen, Trash2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Shield, KeyRound, Calendar, FolderOpen, Trash2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { LicenseOwnerInfo } from '../types';
 
@@ -75,9 +75,6 @@ const OwnerLicense: React.FC = () => {
               </button>
             )}
           </div>
-        } />
-        <Row icon={<Cpu size={16} />} label="Device ID" value={
-          <code style={{ fontSize: 10, wordBreak: 'break-all' }}>{info?.deviceId || '—'}</code>
         } />
         <Row icon={<Calendar size={16} />} label="Activated At" value={info?.activatedAt ? new Date(info.activatedAt).toLocaleString() : '—'} />
         <Row icon={<FolderOpen size={16} />} label="Activation File" value={

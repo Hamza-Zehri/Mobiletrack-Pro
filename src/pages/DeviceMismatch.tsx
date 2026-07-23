@@ -13,9 +13,7 @@ const DeviceMismatch: React.FC = () => {
   const [activated, setActivated] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 520);
 
-  useEffect(() => {
-    window.api.license.getDeviceId().then(setDeviceId);
-  }, []);
+  useEffect(() => {}, []);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 520);

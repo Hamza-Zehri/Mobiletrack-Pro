@@ -18,7 +18,6 @@ contextBridge.exposeInMainWorld('api', {
   // License
   license: {
     getStatus:    () => invoke('license:getStatus'),
-    getDeviceId:  () => invoke('license:getDeviceId'),
     activate:     (key) => invoke('license:activate', key),
     startTrial:   () => invoke('license:startTrial'),
     getOwnerInfo: () => invoke('license:getOwnerInfo'),
@@ -55,6 +54,7 @@ contextBridge.exposeInMainWorld('api', {
     delete:    (id)      => invoke('phones:delete', id),
     history:   (q)       => invoke('phones:history', q),
     checkImei: (im, ex)  => invoke('phones:checkImei', im, ex),
+    getImages: (id)      => invoke('phones:getImages', id),
   },
   // Purchases
   purchases: {
@@ -74,9 +74,13 @@ contextBridge.exposeInMainWorld('api', {
   },
   // Sales
   sales: {
-    getAll:  (f)  => invoke('sales:getAll', f),
-    getById: (id) => invoke('sales:getById', id),
-    create:  (d)  => invoke('sales:create', d),
+    getAll:     (f)  => invoke('sales:getAll', f),
+    getById:    (id) => invoke('sales:getById', id),
+    create:     (d)  => invoke('sales:create', d),
+    update:     (id, d) => invoke('sales:update', id, d),
+    returnSale: (saleId, d) => invoke('sales:return', saleId, d),
+    getReturns: ()   => invoke('sales:getReturns'),
+    invested:   ()   => invoke('sales:invested'),
   },
   // Invoice
   invoice: {

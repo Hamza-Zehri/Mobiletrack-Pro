@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Smartphone, Shield, Cpu, Package, DollarSign, User, Camera, ArrowLeft, Save, AlertCircle } from 'lucide-react';
+import { Smartphone, Shield, Cpu, Package, DollarSign, User, Camera, ArrowLeft, Save, AlertCircle, CreditCard } from 'lucide-react';
 import { PtaStatus } from '../types';
 import { fileToBase64 } from '../utils';
 import { SectionTitle } from '../components/ui/Toast';
@@ -89,6 +89,7 @@ const AddPhone: React.FC = () => {
   const [form, setForm]   = useState<any>({ ...EMPTY });
   const [errors, setErrors] = useState<any>({});
   const [images, setImages] = useState<{ preview:string; b64:string; name:string }[]>([]);
+  const [cnicImages, setCnicImages] = useState<{ preview:string; b64:string; name:string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [imeiError, setImeiError] = useState('');
 
@@ -117,6 +118,14 @@ const AddPhone: React.FC = () => {
     }
   };
 
+  const handleCnicImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    for (const file of files) {
+      const b64 = await fileToBase64(file);
+      setCnicImages(prev => [...prev, { preview: `data:${file.type};base64,${b64}`, b64, name: `cnic_${Date.now()}_${file.name}` }]);
+    }
+  };
+
   const validate = () => {
     const e: any = {};
     if (!form.brand)      e.brand = 'Required';
@@ -133,17 +142,21 @@ const AddPhone: React.FC = () => {
     setLoading(true);
     try {
       // Save images first
-      const savedPaths: string[] = [];
+      const savedImages: { path: string; type: string }[] = [];
       for (const img of images) {
         const p = await window.api.images.save(img.b64, img.name);
-        savedPaths.push(p);
+        savedImages.push({ path: p, type: 'phone' });
+      }
+      for (const img of cnicImages) {
+        const p = await window.api.images.save(img.b64, img.name);
+        savedImages.push({ path: p, type: 'cnic' });
       }
 
       const payload = {
         ...form,
         cost_price: parseFloat(form.cost_price) || 0,
         sale_price: form.sale_price ? parseFloat(form.sale_price) : null,
-        images: savedPaths,
+        images: savedImages,
       };
 
       if (isEdit) {
@@ -333,7 +346,7 @@ const AddPhone: React.FC = () => {
               <input type="file" multiple accept="image/*" style={{ display:'none' }} onChange={handleImages}/>
               <div className="upload-zone">
                 <Camera size={24} color="var(--text3)" style={{ margin:'0 auto 8px', display:'block' }}/>
-                <div style={{ fontSize:12, color:'var(--text2)' }}>Click to upload photos</div>
+                <div style={{ fontSize:12, color:'var(--text2)' }}>Click to upload phone photos</div>
               </div>
             </label>
             {images.length > 0 && (
@@ -342,6 +355,29 @@ const AddPhone: React.FC = () => {
                   <div key={i} style={{ position:'relative' }}>
                     <img src={img.preview} alt="" style={{ width:'100%', height:70, objectFit:'cover', borderRadius:6, border:'1px solid var(--border)' }}/>
                     <button onClick={()=>setImages(prev=>prev.filter((_,j)=>j!==i))} style={{ position:'absolute', top:3, right:3, width:18, height:18, borderRadius:'50%', background:'var(--red)', border:'none', cursor:'pointer', color:'#fff', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* CNIC Images */}
+          <div className="card">
+            <SectionTitle icon={<CreditCard size={15}/>}>Seller CNIC Images</SectionTitle>
+            <p style={{ fontSize:12, color:'var(--text3)', marginBottom:10 }}>Capture the seller's CNIC for record keeping</p>
+            <label style={{ display:'block', cursor:'pointer' }}>
+              <input type="file" multiple accept="image/*" style={{ display:'none' }} onChange={handleCnicImages}/>
+              <div className="upload-zone">
+                <CreditCard size={24} color="var(--text3)" style={{ margin:'0 auto 8px', display:'block' }}/>
+                <div style={{ fontSize:12, color:'var(--text2)' }}>Click to upload CNIC photos</div>
+              </div>
+            </label>
+            {cnicImages.length > 0 && (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8, marginTop:10 }}>
+                {cnicImages.map((img,i) => (
+                  <div key={i} style={{ position:'relative' }}>
+                    <img src={img.preview} alt="" style={{ width:'100%', height:80, objectFit:'cover', borderRadius:6, border:'1px solid var(--border)' }}/>
+                    <button onClick={()=>setCnicImages(prev=>prev.filter((_,j)=>j!==i))} style={{ position:'absolute', top:3, right:3, width:18, height:18, borderRadius:'50%', background:'var(--red)', border:'none', cursor:'pointer', color:'#fff', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
                   </div>
                 ))}
               </div>
