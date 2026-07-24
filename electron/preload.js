@@ -91,6 +91,7 @@ contextBridge.exposeInMainWorld('api', {
     getById:     (id)    => invoke('register:getById', id),
     getSales:    (id)    => invoke('register:getSales', id),
     summary:     (id)    => invoke('register:summary', id),
+    exportPdf:   (html, fn) => invoke('register:exportPdf', html, fn),
   },
   // Invoice
   invoice: {

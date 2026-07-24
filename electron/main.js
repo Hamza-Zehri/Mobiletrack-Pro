@@ -207,6 +207,20 @@ function registerIpcHandlers(svc, bk) {
   guarded('register:getSales',  (_, id) => svc.getSessionSales(id));
   guarded('register:summary',   (_, id) => svc.getRegisterSummary(id));
 
+  // ── Register PDF Export ──
+  guarded('register:exportPdf', async (_, html, filename) => {
+    const pdfWin = new BrowserWindow({
+      show: false, width: 800, height: 1100,
+      webPreferences: { offscreen: true },
+    });
+    await pdfWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const data = await pdfWin.webContents.printToPDF({ printBackground: true, pageSize: 'A4', margins: { top: 10, bottom: 10, left: 10, right: 10 } });
+    pdfWin.close();
+    const dest = path.join(INV_DIR, filename || `day-report-${Date.now()}.pdf`);
+    fs.writeFileSync(dest, data);
+    return { ok: true, path: dest };
+  });
+
   // ── Invoice / PDF ──
   guarded('invoice:generate', async (_, saleId) => {
     const PdfService = require('./services/pdfService');

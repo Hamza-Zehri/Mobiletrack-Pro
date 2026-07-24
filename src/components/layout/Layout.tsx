@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
@@ -30,6 +30,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const loc  = useLocation();
   const { settings, logoBase64, theme, toggleTheme, logout } = useApp();
   const [search, setSearch] = useState('');
+  const [dayActive, setDayActive] = useState(false);
+
+  useEffect(() => {
+    window.api.register.getCurrent().then(s => setDayActive(!!s)).catch(() => {});
+  }, [loc.pathname]);
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && search.trim()) {
@@ -86,6 +91,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               >
                 <item.Icon size={17} />
                 <span style={{ flex:1 }}>{item.label}</span>
+                {item.path === '/cash-register' && dayActive && (
+                  <span style={{ width:7, height:7, borderRadius:'50%', background:'var(--green)', flexShrink:0 }} />
+                )}
               </div>
             );
           })}
