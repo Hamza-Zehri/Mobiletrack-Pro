@@ -568,6 +568,10 @@ class DBService {
         VALUES(?,?,?,?,?,?,?,?,?)
       `).run(invoiceNo, d.phone_id, customerId, d.sale_price, d.discount||0, finalAmount, phone.cost_price, profit, d.notes||null);
       this.db.prepare("UPDATE phones SET status='sold' WHERE id=?").run(d.phone_id);
+      const reg = this.db.prepare("SELECT id FROM cash_register WHERE status='open' ORDER BY created_at DESC LIMIT 1").get();
+      if (reg) {
+        this.db.prepare('INSERT INTO register_sales(register_id,sale_id,amount) VALUES(?,?,?)').run(reg.id, r.lastInsertRowid, finalAmount);
+      }
       return { ok: true, id: r.lastInsertRowid, invoice_number: invoiceNo };
     });
     return run(data);
@@ -690,6 +694,116 @@ class DBService {
       WHERE pur.customer_id=? AND pi.image_type='cnic'
       ORDER BY pi.created_at DESC
     `).all(customerId));
+  }
+
+  // ─── Cash Register ───────────────────────────────────────────────────
+  openRegister(data) {
+    const existing = this.db.prepare("SELECT id FROM cash_register WHERE status='open'").get();
+    if (existing) return { ok: false, error: 'A register is already open. Close it first.' };
+    const today = new Date().toISOString().slice(0, 10);
+    const r = this.db.prepare(`
+      INSERT INTO cash_register(session_date, opening_balance, notes)
+      VALUES(?,?,?)
+    `).run(today, data.opening_balance || 0, data.notes || null);
+    return { ok: true, id: r.lastInsertRowid, session_date: today };
+  }
+
+  closeRegister(id, data) {
+    const run = this.db.transaction((rid) => {
+      const reg = this.db.prepare('SELECT * FROM cash_register WHERE id=?').get(rid);
+      if (!reg) throw new Error('Register session not found');
+      if (reg.status === 'closed') throw new Error('Register is already closed');
+
+      const totals = this.db.prepare(`
+        SELECT
+          COALESCE(SUM(rs.amount),0) total_sales,
+          COUNT(rs.id) sales_count
+        FROM register_sales rs
+        JOIN sales s ON rs.sale_id=s.id
+        WHERE rs.register_id=? AND s.returned=0
+      `).get(rid);
+
+      const returnTotals = this.db.prepare(`
+        SELECT COALESCE(SUM(pr.refund_amount),0) total_returns
+        FROM phone_returns pr
+        JOIN register_sales rs ON pr.sale_id=rs.sale_id
+        WHERE rs.register_id=?
+      `).get(rid);
+
+      this.db.prepare(`
+        UPDATE cash_register
+        SET closing_balance=?, total_sales=?, total_returns=?,
+            total_received=?, cash_in=?, cash_out=?, notes=?, status='closed', closed_at=datetime('now','localtime')
+        WHERE id=?
+      `).run(
+        data.closing_balance || 0,
+        totals.total_sales,
+        returnTotals.total_returns,
+        totals.total_sales - returnTotals.total_returns,
+        data.cash_in || 0,
+        data.cash_out || 0,
+        data.notes || reg.notes,
+        rid
+      );
+
+      return { ok: true, totalSales: totals.total_sales, totalReturns: returnTotals.total_returns, salesCount: totals.sales_count };
+    });
+    return run(id);
+  }
+
+  getCurrentSession() {
+    return this.db.prepare("SELECT * FROM cash_register WHERE status='open' ORDER BY created_at DESC LIMIT 1").get() || null;
+  }
+
+  getSessions(filters = {}) {
+    let sql = 'SELECT * FROM cash_register WHERE 1=1';
+    const params = [];
+    if (filters.from) { sql += ' AND session_date>=?'; params.push(filters.from); }
+    if (filters.to) { sql += ' AND session_date<=?'; params.push(filters.to); }
+    if (filters.status) { sql += ' AND status=?'; params.push(filters.status); }
+    sql += ' ORDER BY created_at DESC';
+    return this.db.prepare(sql).all(...params);
+  }
+
+  getSessionById(id) {
+    return this.db.prepare('SELECT * FROM cash_register WHERE id=?').get(id);
+  }
+
+  getSessionSales(registerId) {
+    return this._decryptRows(this.db.prepare(`
+      SELECT s.*, ph.model, ph.brand, ph.storage, ph.pta_status, ph.imei1,
+             c.name customer, c.mobile customer_mobile
+      FROM register_sales rs
+      JOIN sales s ON rs.sale_id=s.id
+      JOIN phones ph ON s.phone_id=ph.id
+      JOIN customers c ON s.customer_id=c.id
+      WHERE rs.register_id=?
+      ORDER BY rs.created_at DESC
+    `).all(registerId));
+  }
+
+  getRegisterSummary(id) {
+    const session = this.getSessionById(id);
+    if (!session) return null;
+    const sales = this.getSessionSales(id);
+    const returns = this.db.prepare(`
+      SELECT pr.*, s.invoice_number
+      FROM phone_returns pr
+      JOIN register_sales rs ON pr.sale_id=rs.sale_id
+      WHERE rs.register_id=?
+    `).all(id);
+    return {
+      session,
+      sales,
+      returns,
+      totalSales: session.total_sales || 0,
+      totalReturns: session.total_returns || 0,
+      totalReceived: session.total_received || 0,
+      cashIn: session.cash_in || 0,
+      cashOut: session.cash_out || 0,
+      salesCount: sales.length,
+      returnsCount: returns.length,
+    };
   }
 
   // ─── Inventory Investment ──────────────────────────────────────────────

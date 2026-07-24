@@ -139,6 +139,37 @@ class DB {
       );
 
       INSERT OR IGNORE INTO backup_settings(id) VALUES(1);
+
+      -- ── Cash Register ────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS cash_register (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_date     TEXT    NOT NULL,
+        opening_balance  REAL    DEFAULT 0,
+        closing_balance  REAL    DEFAULT 0,
+        cash_in          REAL    DEFAULT 0,
+        cash_out         REAL    DEFAULT 0,
+        total_sales      REAL    DEFAULT 0,
+        total_returns    REAL    DEFAULT 0,
+        total_received   REAL    DEFAULT 0,
+        status           TEXT    NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),
+        notes            TEXT,
+        created_at       TEXT    DEFAULT (datetime('now','localtime')),
+        closed_at        TEXT
+      );
+
+      -- ── Register Sales (link) ────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS register_sales (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        register_id INTEGER NOT NULL REFERENCES cash_register(id),
+        sale_id     INTEGER NOT NULL REFERENCES sales(id),
+        amount      REAL    NOT NULL,
+        created_at  TEXT    DEFAULT (datetime('now','localtime'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_reg_sales_reg ON register_sales(register_id);
+      CREATE INDEX IF NOT EXISTS idx_reg_sales_sale ON register_sales(sale_id);
+      CREATE INDEX IF NOT EXISTS idx_reg_status     ON cash_register(status);
+      CREATE INDEX IF NOT EXISTS idx_reg_date       ON cash_register(session_date);
     `);
 
     // ── Migrations for existing databases ──

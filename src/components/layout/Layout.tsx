@@ -4,7 +4,8 @@ import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard, Smartphone, ShoppingCart, Receipt,
   Users, History, BarChart2, UploadCloud, Settings,
-  Info, Moon, Sun, Minus, Square, X, Bell, LogOut, Search
+  Info, Moon, Sun, Minus, Square, X, Bell, LogOut, Search,
+  DollarSign
 } from 'lucide-react';
 
 const NAV = [
@@ -15,6 +16,7 @@ const NAV = [
   { label: 'Sales',         path: '/sales',        Icon: Receipt },
   { section: 'Management' },
   { label: 'Customers',     path: '/customers',    Icon: Users },
+  { label: 'Cash Register',  path: '/cash-register', Icon: DollarSign },
   { label: 'Phone History', path: '/history',      Icon: History },
   { label: 'Reports',       path: '/reports',      Icon: BarChart2 },
   { section: 'System' },
@@ -154,6 +156,7 @@ function getTitleFromPath(p: string): string {
     '/purchase':  'Purchase',
     '/sales':     'Sales',
     '/customers': 'Customers',
+    '/cash-register': 'Cash Register',
     '/history':   'Phone History',
     '/reports':   'Reports',
     '/backup':    'Backup & Restore',

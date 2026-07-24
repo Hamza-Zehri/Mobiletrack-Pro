@@ -198,6 +198,15 @@ function registerIpcHandlers(svc, bk) {
   guarded('sales:getReturns', () => svc.getReturns());
   guarded('sales:invested',  () => svc.getInventoryInvested());
 
+  // ── Cash Register ──
+  guarded('register:open',      (_, data) => svc.openRegister(data));
+  guarded('register:close',     (_, id, data) => svc.closeRegister(id, data));
+  guarded('register:getCurrent',() => svc.getCurrentSession());
+  guarded('register:getAll',    (_, f) => svc.getSessions(f));
+  guarded('register:getById',   (_, id) => svc.getSessionById(id));
+  guarded('register:getSales',  (_, id) => svc.getSessionSales(id));
+  guarded('register:summary',   (_, id) => svc.getRegisterSummary(id));
+
   // ── Invoice / PDF ──
   guarded('invoice:generate', async (_, saleId) => {
     const PdfService = require('./services/pdfService');

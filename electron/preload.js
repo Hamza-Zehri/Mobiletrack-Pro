@@ -82,6 +82,16 @@ contextBridge.exposeInMainWorld('api', {
     getReturns: ()   => invoke('sales:getReturns'),
     invested:   ()   => invoke('sales:invested'),
   },
+  // Cash Register
+  register: {
+    open:        (d)     => invoke('register:open', d),
+    close:       (id, d) => invoke('register:close', id, d),
+    getCurrent:  ()      => invoke('register:getCurrent'),
+    getAll:      (f)     => invoke('register:getAll', f),
+    getById:     (id)    => invoke('register:getById', id),
+    getSales:    (id)    => invoke('register:getSales', id),
+    summary:     (id)    => invoke('register:summary', id),
+  },
   // Invoice
   invoice: {
     generate: (id) => invoke('invoice:generate', id),

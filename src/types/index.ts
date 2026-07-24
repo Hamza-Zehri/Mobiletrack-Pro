@@ -191,6 +191,36 @@ export interface SaleFormData {
   notes?: string;
 }
 
+// ─── Cash Register ───────────────────────────────────────────────────────────
+export interface CashSession {
+  id: number;
+  session_date: string;
+  opening_balance: number;
+  closing_balance: number;
+  cash_in: number;
+  cash_out: number;
+  total_sales: number;
+  total_returns: number;
+  total_received: number;
+  status: 'open' | 'closed';
+  notes?: string;
+  created_at: string;
+  closed_at?: string;
+}
+
+export interface RegisterSummary {
+  session: CashSession;
+  sales: Sale[];
+  returns: any[];
+  totalSales: number;
+  totalReturns: number;
+  totalReceived: number;
+  cashIn: number;
+  cashOut: number;
+  salesCount: number;
+  returnsCount: number;
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export interface DashboardStats {
   totalStock: number;
@@ -306,6 +336,7 @@ declare global {
       purchases:  { getAll(f?: any): Promise<Purchase[]>; getById(id: number): Promise<Purchase>; add(d: any): Promise<any>; addBulk(d: any): Promise<any> };
       customers:  { getAll(q?: string): Promise<Customer[]>; getById(id: number): Promise<Customer>; add(d: any): Promise<any>; update(id: number, d: any): Promise<any>; delete(id: number): Promise<any>; history(id: number): Promise<any> };
       sales:      { getAll(f?: any): Promise<Sale[]>; getById(id: number): Promise<Sale>; create(d: SaleFormData): Promise<any>; update(id: number, d: any): Promise<any>; returnSale(saleId: number, d: any): Promise<any>; getReturns(): Promise<any[]>; invested(): Promise<{ count: number; total: number }> };
+      register:   { open(d: any): Promise<any>; close(id: number, d: any): Promise<any>; getCurrent(): Promise<CashSession | null>; getAll(f?: any): Promise<CashSession[]>; getById(id: number): Promise<CashSession | null>; getSales(id: number): Promise<Sale[]>; summary(id: number): Promise<RegisterSummary | null> };
       invoice:    { generate(id: number): Promise<{ ok: boolean; path: string; invoice_number: string }> };
       whatsapp:   { share(path: string, phone: string, msg: string): Promise<any> };
       reports:    { sales(r: DateRange): Promise<any>; profit(r: DateRange): Promise<any>; purchase(r: DateRange): Promise<any>; inventory(): Promise<any>; customer(id: number): Promise<any>; exportPdf(t: string, r: DateRange): Promise<any>; exportExcel(t: string, r: DateRange): Promise<any> };

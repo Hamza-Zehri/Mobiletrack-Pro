@@ -21,6 +21,8 @@ import Backup from './pages/Backup';
 import Settings from './pages/Settings';
 import About from './pages/About';
 import OwnerLicense from './pages/OwnerLicense';
+import CashRegister from './pages/CashRegister';
+import RegisterDetail from './pages/RegisterDetail';
 import Toast from './components/ui/Toast';
 import './styles/global.css';
 
@@ -60,6 +62,8 @@ const AppRoutes: React.FC = () => {
         <Route path="/sales/invoice/:id" element={<InvoicePage />} />
         <Route path="/customers"      element={<Customers />} />
         <Route path="/customers/:id"  element={<CustomerDetail />} />
+        <Route path="/cash-register"  element={<CashRegister />} />
+        <Route path="/cash-register/:id" element={<RegisterDetail />} />
         <Route path="/history"        element={<PhoneHistory />} />
         <Route path="/reports"        element={<Reports />} />
         <Route path="/backup"         element={<Backup />} />
