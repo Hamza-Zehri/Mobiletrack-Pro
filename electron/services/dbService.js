@@ -790,6 +790,7 @@ class DBService {
       SELECT pr.*, s.invoice_number
       FROM phone_returns pr
       JOIN register_sales rs ON pr.sale_id=rs.sale_id
+      JOIN sales s ON pr.sale_id=s.id
       WHERE rs.register_id=?
     `).all(id);
     return {

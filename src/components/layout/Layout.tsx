@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Smartphone, ShoppingCart, Receipt,
   Users, History, BarChart2, UploadCloud, Settings,
   Info, Moon, Sun, Minus, Square, X, Bell, LogOut, Search,
-  DollarSign
+  DollarSign, Sunrise, Sunset
 } from 'lucide-react';
 
 const NAV = [
@@ -28,13 +28,56 @@ const NAV = [
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const nav  = useNavigate();
   const loc  = useLocation();
-  const { settings, logoBase64, theme, toggleTheme, logout } = useApp();
+  const { settings, logoBase64, theme, toggleTheme, logout, toast } = useApp();
   const [search, setSearch] = useState('');
   const [dayActive, setDayActive] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
+  const [dayLoading, setDayLoading] = useState(false);
 
-  useEffect(() => {
-    window.api.register.getCurrent().then(s => setDayActive(!!s)).catch(() => {});
-  }, [loc.pathname]);
+  const refreshDay = () => {
+    window.api.register.getCurrent().then(s => {
+      setDayActive(!!s);
+      setCurrentSessionId(s?.id ?? null);
+    }).catch(() => {});
+  };
+
+  useEffect(() => { refreshDay(); }, [loc.pathname]);
+
+  const handleStartDay = async () => {
+    setDayLoading(true);
+    try {
+      const res = await window.api.register.open({ opening_balance: 0 });
+      if (res.ok) {
+        toast('Day started!', 'success');
+        refreshDay();
+      } else {
+        toast(res.error || 'Failed', 'error');
+      }
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error');
+    } finally {
+      setDayLoading(false);
+    }
+  };
+
+  const handleEndDay = async () => {
+    if (!currentSessionId) return;
+    setDayLoading(true);
+    try {
+      const res = await window.api.register.close(currentSessionId, { closing_balance: 0 });
+      if (res.ok) {
+        toast(`Day ended. ${res.salesCount} sales.`, 'success');
+        refreshDay();
+        nav(`/cash-register/${currentSessionId}`);
+      } else {
+        toast(res.error || 'Failed', 'error');
+      }
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error');
+    } finally {
+      setDayLoading(false);
+    }
+  };
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && search.trim()) {
@@ -134,6 +177,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 style={{ background:'none', border:'none', outline:'none', color:'var(--text)', fontSize:12, width:'100%', fontFamily:'inherit' }}
               />
             </div>
+
+            {/* Day Session Button */}
+            {dayActive ? (
+              <button className="btn btn-sm btn-danger" onClick={handleEndDay} disabled={dayLoading} style={{ gap: 5 }}>
+                <Sunset size={14} /> End Day
+              </button>
+            ) : (
+              <button className="btn btn-sm btn-success" onClick={handleStartDay} disabled={dayLoading} style={{ gap: 5 }}>
+                <Sunrise size={14} /> Start Day
+              </button>
+            )}
 
             <button className="icon-btn" onClick={toggleTheme} title="Toggle theme">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
