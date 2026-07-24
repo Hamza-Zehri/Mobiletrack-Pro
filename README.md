@@ -17,7 +17,7 @@ MobileTrack Pro is a complete offline-first desktop application for used mobile 
 | Desktop      | Electron 29                         |
 | Frontend     | React 18 + TypeScript               |
 | Database     | SQLite via better-sqlite3           |
-| PDF          | jsPDF + jsPDF-AutoTable             |
+| PDF          | jsPDF + jsPDF-AutoTable + printToPDF |
 | Excel        | SheetJS (xlsx)                      |
 | Charts       | Recharts                            |
 | Backup       | archiver + unzipper + AES-256-CBC   |
@@ -33,7 +33,7 @@ mobiletrack-pro/
 ├── electron/
 │   ├── main.js                 # Electron main process + IPC handlers
 │   ├── preload.js              # Secure context bridge (window.api)
-│   ├── database.js             # SQLite DB init + schema
+│   ├── database.js             # SQLite DB init + schema + migrations
 │   ├── tools/
 │   │   └── generateLicenseKey.js  # Vendor tool — generate license keys
 │   └── services/
@@ -53,7 +53,7 @@ mobiletrack-pro/
 │   ├── styles/global.css       # Design system (dark/light CSS vars)
 │   │
 │   ├── components/
-│   │   ├── layout/Layout.tsx   # Sidebar + Topbar + Window controls
+│   │   ├── layout/Layout.tsx   # Sidebar + Topbar + Start/End Day + Window controls
 │   │   └── ui/
 │   │       ├── Toast.tsx       # Toast, Modal, Badge, Confirm, Spinner
 │   │       └── SupportContact.tsx  # Developer contact component
@@ -66,14 +66,16 @@ mobiletrack-pro/
 │       ├── Login.tsx           # Authentication
 │       ├── Dashboard.tsx       # Stats + Charts + Activity feed
 │       ├── Inventory.tsx       # Phone list with filters
-│       ├── AddPhone.tsx        # Add/Edit phone form
+│       ├── AddPhone.tsx        # Add/Edit phone form + CNIC upload
 │       ├── Purchase.tsx        # Purchase history + type selection
 │       ├── BulkPurchase.tsx    # Spreadsheet-style bulk entry
-│       ├── Sales.tsx           # New sale + history
+│       ├── Sales.tsx           # New sale + history + edit/return
 │       ├── InvoicePage.tsx     # PDF invoice preview + share
 │       ├── Customers.tsx       # Customer management
 │       ├── CustomerDetail.tsx  # Profile + transaction timeline
 │       ├── PhoneHistory.tsx    # Lifetime IMEI history search
+│       ├── CashRegister.tsx    # Start Day / End Day + session history
+│       ├── RegisterDetail.tsx  # Day report with Print + Save PDF
 │       ├── Reports.tsx         # Reports with PDF/Excel export
 │       ├── Backup.tsx          # Backup & restore
 │       ├── Settings.tsx        # Shop/Invoice/WhatsApp/Security
@@ -131,14 +133,12 @@ This will:
    - **"Start 7-day trial"** → Full access for 7 days, no restrictions
 2. **During Trial** — App works normally, license status shown in About page
 3. **After Trial Expires** — Stuck on Activation page, must enter valid key
-4. **Device Binding** — Each license key is bound to one device after activation
 
 ### Key Features
-- Offline license validation (HMAC-SHA256 checksum, no internet required)
-- Hardware fingerprinting (Machine GUID, MAC address, CPU model)
-- Trial start date stored encrypted in `activation.dat`
-- License status visible in **About** page with key, activation date, trial countdown
-- DeviceMismatch page allows re-activation with a new key
+- Simple plain-text license key comparison (`MTP-XXXX-XXXX-XXXX-XXXX`)
+- No device binding — works on any machine with the same key
+- Trial start date stored in `%APPDATA%/MobileShopSystem/install_date.dat`
+- License status visible in **About** page with key and activation date
 
 ### Generating License Keys (Vendor Tool)
 ```bash
@@ -149,8 +149,8 @@ node electron/tools/generateLicenseKey.js 5      # Generate 5 keys
 Key format: `MTP-XXXX-XXXX-XXXX-XXXX` (20 chars + MTP prefix)
 
 ### Configuration
-- `TRIAL_DAYS = 7` in `electron/services/licenseService.js:14` — change to adjust trial length
-- Activation data stored at: `%APPDATA%\MobileShopSystem\activation.dat`
+- `TRIAL_DAYS = 7` in `electron/services/licenseService.js` — change to adjust trial length
+- Activation data stored at: `%APPDATA%\MobileShopSystem\`
 
 ---
 
@@ -174,7 +174,7 @@ Key format: `MTP-XXXX-XXXX-XXXX-XXXX` (20 chars + MTP prefix)
 ### Inventory
 - Add phones with full specs (brand, model, IMEI, PTA status, battery, accessories)
 - IMEI duplicate detection
-- Multi-image upload per phone
+- Multi-image upload per phone (phone photos + seller CNIC)
 - Filter by PTA/JV/CPID/Non-PTA/Android/Available/Sold
 
 ### Purchase
@@ -185,6 +185,8 @@ Key format: `MTP-XXXX-XXXX-XXXX-XXXX` (20 chars + MTP prefix)
 - Real-time phone search (by model/IMEI)
 - Auto profit calculation
 - One-click: complete sale + generate PDF invoice
+- **Edit sales** — modify price/discount after sale
+- **Return phones** — mark sale as returned, phone goes back to available stock
 
 ### Invoices (PDF)
 - Branded with shop logo and colors
@@ -194,10 +196,30 @@ Key format: `MTP-XXXX-XXXX-XXXX-XXXX` (20 chars + MTP prefix)
 - Signature fields
 - WhatsApp sharing (opens wa.me link + PDF)
 
+### Cash Register (Start Day / End Day)
+- **Topbar shortcut** — Start Day / End Day button always visible in the topbar
+- **Start Day** — click to begin tracking all sales for the day
+- **End Day** — click to close the day and view the full report
+- **Day Report** — shows all sales, returns, totals, and profit
+- **Print** — opens system print dialog (includes Save as PDF option)
+- **Save PDF** — saves the day report as a PDF file to the invoices folder
+- **Sidebar indicator** — green dot shows when a day is active
+- **Session history** — browse all past days with their reports
+
 ### Reports
 - Sales, Profit, Purchase, Inventory reports
 - Date range filters (daily/weekly/monthly/yearly)
 - Export to PDF or Excel
+
+### Phone Returns
+- Return any sold phone with reason and refund amount
+- Phone status reverts to available
+- Returns excluded from all sales reports and profit calculations
+
+### Customer Management
+- Full customer profiles with CNIC and address
+- Transaction history (sales + purchases)
+- Safe delete — prevents deletion if transactions exist
 
 ### Backup
 - Encrypted `.shopbackup` files (AES-256-CBC)
@@ -213,16 +235,19 @@ Key format: `MTP-XXXX-XXXX-XXXX-XXXX` (20 chars + MTP prefix)
 
 ## Database Schema
 
-| Table           | Purpose                          |
-|-----------------|----------------------------------|
-| `settings`      | Key-value store for all config   |
-| `customers`     | Customer profiles                |
-| `suppliers`     | Wholesale suppliers              |
-| `purchases`     | Purchase header records          |
-| `phones`        | Inventory (available + sold)     |
-| `phone_images`  | Image paths per phone            |
-| `sales`         | Sale records with invoice links  |
-| `backup_settings` | Auto-backup configuration      |
+| Table             | Purpose                                |
+|-------------------|----------------------------------------|
+| `settings`        | Key-value store for all config         |
+| `customers`       | Customer profiles                      |
+| `suppliers`       | Wholesale suppliers                    |
+| `purchases`       | Purchase header records                |
+| `phones`          | Inventory (available + sold)           |
+| `phone_images`    | Phone photos + seller CNIC images      |
+| `sales`           | Sale records with invoice links        |
+| `phone_returns`   | Phone return records                   |
+| `cash_register`   | Daily session tracking (Start/End Day) |
+| `register_sales`  | Links sales to register sessions       |
+| `backup_settings` | Auto-backup configuration              |
 
 ---
 
@@ -230,9 +255,7 @@ Key format: `MTP-XXXX-XXXX-XXXX-XXXX` (20 chars + MTP prefix)
 
 - Passwords hashed with bcrypt (10 rounds)
 - Backup files encrypted with AES-256-CBC
-- License keys validated with HMAC-SHA256 checksums
-- Activation data encrypted with AES-256-GCM
-- Hardware-bound device fingerprinting
+- Field-level encryption for customer/supplier names, IMEIs
 - SQLite WAL mode for data integrity
 - Electron `contextIsolation: true` + `nodeIntegration: false`
 - All IPC via secure preload context bridge
