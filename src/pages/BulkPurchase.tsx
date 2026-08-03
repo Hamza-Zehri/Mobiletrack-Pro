@@ -4,6 +4,11 @@ import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
 import { BulkPhoneRow, PtaStatus } from '../types';
 import { useApp } from '../context/AppContext';
 
+const BRANDS = [
+  'Apple','Samsung','Xiaomi','Redmi','Oppo','Infinix','Vivo','Realme',
+  'Tecno','Google','OnePlus','Huawei','Nokia','Motorola','Other'
+];
+
 const EMPTY_ROW = (brand = 'Samsung'): BulkPhoneRow => ({
   brand, model:'', storage:'128GB', color:'', pta_status:'pta',
   imei1:'', imei2:'', battery_health:'', cost_price:0, sale_price:0, face_id:'Working', true_tone:'Working', box:false, charger:false,
@@ -79,8 +84,8 @@ const BulkPurchase: React.FC = () => {
       <div className="card" style={{ marginBottom:14, borderColor:'var(--accent)', background:'linear-gradient(135deg, rgba(108,99,255,0.06), transparent)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
           <div style={{ fontSize:13, fontWeight:700 }}>Brand for all phones:</div>
-          <div style={{ display:'flex', gap:6 }}>
-            {['Apple','Samsung','Other'].map(b => (
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            {BRANDS.map(b => (
               <button key={b} className="btn btn-sm" onClick={()=>applyBrand(b)}
                 style={{ background: globalBrand===b ? 'var(--accent)' : 'var(--surface2)', color: globalBrand===b ? '#fff' : 'var(--text2)', border:'1px solid ' + (globalBrand===b ? 'var(--accent)' : 'var(--border2)') }}>
                 {b}
@@ -112,7 +117,7 @@ const BulkPurchase: React.FC = () => {
                   <td style={{ padding:'8px 10px', color:'var(--text3)', fontWeight:600 }}>{i+1}</td>
                   <Cell>
                     <select value={row.brand} onChange={e=>setRow(i,'brand',e.target.value)} style={cellInput}>
-                      <option>Apple</option><option>Samsung</option><option>Other</option>
+                      {BRANDS.map(b => <option key={b}>{b}</option>)}
                     </select>
                   </Cell>
                   <Cell>
