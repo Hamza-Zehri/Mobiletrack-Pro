@@ -4,8 +4,8 @@ import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
 import { BulkPhoneRow, PtaStatus } from '../types';
 import { useApp } from '../context/AppContext';
 
-const EMPTY_ROW = (): BulkPhoneRow => ({
-  brand:'Apple', model:'iPhone 15', storage:'128GB', color:'', pta_status:'pta',
+const EMPTY_ROW = (brand = 'Samsung'): BulkPhoneRow => ({
+  brand, model:'', storage:'128GB', color:'', pta_status:'pta',
   imei1:'', imei2:'', battery_health:'', cost_price:0, sale_price:0, face_id:'Working', true_tone:'Working', box:false, charger:false,
 });
 
@@ -17,13 +17,18 @@ const BulkPurchase: React.FC = () => {
     supplier_name:'', supplier_mobile:'', market_name:'Saddar Mobile Market',
     purchase_date: new Date().toISOString().slice(0,10), notes:'',
   });
+  const [globalBrand, setGlobalBrand] = useState('Samsung');
   const [rows, setRows] = useState<BulkPhoneRow[]>([EMPTY_ROW(), EMPTY_ROW()]);
-
   const setH = (k: string, v: string) => setHeader(h => ({ ...h, [k]: v }));
   const setRow = (i: number, k: keyof BulkPhoneRow, v: any) =>
     setRows(rs => rs.map((r, j) => j === i ? { ...r, [k]: v } : r));
-  const addRow = () => setRows(rs => [...rs, EMPTY_ROW()]);
+  const addRow = () => setRows(rs => [...rs, { ...EMPTY_ROW(), brand: globalBrand }]);
   const removeRow = (i: number) => setRows(rs => rs.filter((_, j) => j !== i));
+
+  const applyBrand = (brand: string) => {
+    setGlobalBrand(brand);
+    setRows(rs => rs.map(r => ({ ...r, brand })));
+  };
 
   const total = rows.reduce((s, r) => s + (Number(r.cost_price) || 0), 0);
 
@@ -67,6 +72,22 @@ const BulkPurchase: React.FC = () => {
           </div>
           <div className="field"><label>Purchase Date</label><input type="date" value={header.purchase_date} onChange={e=>setH('purchase_date',e.target.value)}/></div>
           <div className="field" style={{ gridColumn:'span 2' }}><label>Notes</label><input value={header.notes} onChange={e=>setH('notes',e.target.value)} placeholder="Optional notes"/></div>
+        </div>
+      </div>
+
+      {/* Global Brand */}
+      <div className="card" style={{ marginBottom:14, borderColor:'var(--accent)', background:'linear-gradient(135deg, rgba(108,99,255,0.06), transparent)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+          <div style={{ fontSize:13, fontWeight:700 }}>Brand for all phones:</div>
+          <div style={{ display:'flex', gap:6 }}>
+            {['Apple','Samsung','Other'].map(b => (
+              <button key={b} className="btn btn-sm" onClick={()=>applyBrand(b)}
+                style={{ background: globalBrand===b ? 'var(--accent)' : 'var(--surface2)', color: globalBrand===b ? '#fff' : 'var(--text2)', border:'1px solid ' + (globalBrand===b ? 'var(--accent)' : 'var(--border2)') }}>
+                {b}
+              </button>
+            ))}
+          </div>
+          <span style={{ fontSize:11, color:'var(--text3)' }}>Applies to {rows.length} {rows.length===1?'phone':'phones'} · each row can still be changed individually</span>
         </div>
       </div>
 
